@@ -260,10 +260,10 @@ IDE_Morph.prototype.init = function (isAutoFill) {
 
     // override inherited properites:
     this.color = this.backgroundColor;
-	
+
 	this.currentPage = 1;
 	this.refreshPage = 0;
-	
+
 	this.openLibrary();
 	//this.library.destroy();
 };
@@ -1519,21 +1519,48 @@ IDE_Morph.prototype.createShareBoxTitleBarButtons = function () {
     shareBoxAddMemberButton = button;
 
 
+    // add annnouncement button
+    button = new PushButtonMorph(
+        this,
+        "showNewAnnouncementPopup",
+        (String.fromCharCode("0xf067")),
+        null,
+        null,
+        null,
+        "iconButton"
+    );
+    button.drawNew();
+    button.hint = 'New Announcement';
+    button.fixLayout();
+    shareBoxAnnouncementButton = button;
+
     // add to title bar
     this.shareBoxTitleBarButtons.add(shareBoxSettingsButton);
     this.shareBoxTitleBarButtons.shareBoxSettingsButton = shareBoxSettingsButton;
     this.shareBoxTitleBarButtons.add(shareBoxAddMemberButton);
     this.shareBoxTitleBarButtons.shareBoxAddMemberButton = shareBoxAddMemberButton;
 
+    // only add to title bar if owner
+    if(myself.shareboxId === tempIdentifier) {
+      this.shareBoxTitleBarButtons.add(shareBoxAnnouncementButton);
+      this.shareBoxTitleBarButtons.shareBoxAnnouncementButton = shareBoxAnnouncementButton;
+    }
+
     // position buttons
     if (this.shareBoxTitleBarButtons) {
         // position add new member button
         this.shareBoxTitleBarButtons.shareBoxAddMemberButton.setLeft(this.shareBoxTitleBarButtons.left());
         this.shareBoxTitleBarButtons.shareBoxAddMemberButton.setTop(this.shareBoxTitleBarButtons.top() + 2);
-
         // position settings button
         this.shareBoxTitleBarButtons.shareBoxSettingsButton.setTop(this.shareBoxTitleBarButtons.top() + 2);
         this.shareBoxTitleBarButtons.shareBoxSettingsButton.setLeft(this.shareBoxTitleBarButtons.shareBoxAddMemberButton.right());
+
+        // if owner then set position
+        if(myself.shareboxId === tempIdentifier) {
+          // position add new announcement button
+          this.shareBoxTitleBarButtons.shareBoxAnnouncementButton.setLeft(this.shareBoxTitleBarButtons.shareBoxSettingsButton.right());
+          this.shareBoxTitleBarButtons.shareBoxAnnouncementButton.setTop(this.shareBoxTitleBarButtons.top() + 2);
+        }
     }
 
     this.fixLayout();
@@ -1793,6 +1820,15 @@ IDE_Morph.makeSocket = function (myself, shareboxId) {
         ide.shareBox.updateList();
     })
 
+    sharer.socket.on('ANNOUNCEMENT_BROADCAST', function(data) {
+        var message = data.payload;
+        if(data.owner != tempIdentifier) myself.showGroupAnnouncement(message);
+    })
+
+    sharer.socket.on('ANNOUNCEMENT_READ', function() {
+        myself.showAnnouncementSuccess();
+    })
+
     // When I receive data, I parse objectData and add it to my data list
     sharer.socket.on('UPDATE_SHAREBOX_VIEW', function (objectData) {
         // Clean up shareBoxPlaceholderSprite
@@ -1836,7 +1872,7 @@ IDE_Morph.makeSocket = function (myself, shareboxId) {
     }.bind(sharer));
 
 
-    
+
     return sharer;
 };
 
@@ -1849,10 +1885,10 @@ IDE_Morph.prototype.createShareBox = function () {
     // Initialization of Sharebox and its default behavior
     var scripts = this.shareBoxPlaceholderSprite.scripts,
         myself = this;
-        
+
 
     shareboxId = typeof myself.shareboxId !== 'undefined' ? myself.shareboxId : 'No Group Yet';
-    
+
     var room = shareboxId.toString();
 
     // Destroy if sharebox exists
@@ -2156,7 +2192,7 @@ IDE_Morph.prototype.showEntireShareBoxComponent = function(isOwner) {
         //     myself.createShareBoxTitleBar();
         //     myself.createShareBoxTitleBarButtons();
         //     myself.createShareBox();
-            
+
         //     myself.fixLayout();
 
         //     var txt = new TextMorph(data.data[0].id.toString());
@@ -2174,7 +2210,7 @@ IDE_Morph.prototype.showEntireShareBoxComponent = function(isOwner) {
         myself.createShareBoxTitleBar();
         myself.createShareBoxTitleBarButtons();
         myself.createShareBox();
-        
+
         myself.fixLayout();
 
         var txt = new TextMorph(myself.shareboxId);
@@ -2184,14 +2220,14 @@ IDE_Morph.prototype.showEntireShareBoxComponent = function(isOwner) {
         myself.shareBox.add(txt);
 
     } else {
-        
+
         console.log("show entire share box");
         myself.createShareBoxBar();
         // create title bar buttons
         myself.createShareBoxTitleBar();
         myself.createShareBoxTitleBarButtons();
         myself.createShareBox();
-        
+
         myself.fixLayout();
 
         var txt = new TextMorph(myself.shareboxId);
@@ -2374,10 +2410,10 @@ IDE_Morph.prototype.showRequestReceivedMessage = function (inviteData) {
             myself.destroyShareBox();
             var socketData = {room: inviteData.room, removeId: tempIdentifier};
             myself.sharer.socket.emit('REMOVE_USER', socketData);
-            
+
             // @yiwen - remove the person from pending members
         }
-        
+
     };
     this.requestReceivedScreen.add(acceptButton);
 
@@ -2507,7 +2543,7 @@ IDE_Morph.prototype.showViewMembersPopup = function() {
     var socketData = {room:shareboxId}
     this.sharer.socket.emit('GET_MEMBERS', socketData);
     console.log("[SOCKET-SEND] GET_MEMBERS: " + JSON.stringify(socketData));
-    
+
     // TO BE REFRACTORED
     this.sharer.socket.on('UPDATE_MEMBERS', function(data){
         console.log("[SOCKET-RECEIVE] FIRST_UPDATE_MEMBERS: " + JSON.stringify(data));
@@ -2526,7 +2562,7 @@ IDE_Morph.prototype.showViewMembersPopup = function() {
                     groupMembersIsOnline.push(true);
                 }
             }
-            
+
         };
 
         // set up the frames to contain the member list "viewMembersPopup" and "membersViewFrame"
@@ -2567,9 +2603,9 @@ IDE_Morph.prototype.showViewMembersPopup = function() {
 
         // add close button
         var button = new PushButtonMorph(null, null, "Close me", null, null, null, "green");
-        button.action = function() { 
+        button.action = function() {
             myself.sharer.socket.removeAllListeners("UPDATE_MEMBERS");
-            myself.viewMembersPopup.cancel(); 
+            myself.viewMembersPopup.cancel();
         };
         button.setCenter(myself.viewMembersPopup.center());
         button.setBottom(myself.viewMembersPopup.bottom() - 10);
@@ -2584,7 +2620,7 @@ IDE_Morph.prototype.showViewMembersPopup = function() {
         myself.viewMembersPopup.fixLayout();
         myself.viewMembersPopup.popUp(world);
     })
-    
+
 };
 
 IDE_Morph.prototype.showGroupMemberTitle = function(numberOfGroupMembers) {
@@ -3006,6 +3042,245 @@ IDE_Morph.prototype.showAddMemberPopup = function() {
     this.addMemberPopup.drawNew();
     this.addMemberPopup.fixLayout();
     this.addMemberPopup.popUp(world);
+};
+
+// * * * * * * * * * Announcements Related Popups * * * * * * * * * * * * * * * * *
+/* popups when announcement is broadcasted */
+IDE_Morph.prototype.showGroupAnnouncement = function(message) {
+    var handleAck = function() {
+      myself.sharer.socket.emit('ANNOUNCEMENT_ACK', {room: myself.shareboxId, member: tempIdentifier});
+      myself.createAnnouncePopup.cancel();
+    }
+    var world = this.world();
+    var myself = this;
+    var popupWidth = 400;
+    var popupHeight = 330;
+
+    if (this.createAnnouncePopup) {
+        this.createAnnouncePopup.destroy();
+    }
+    this.createAnnouncePopup = new DialogBoxMorph();
+    this.createAnnouncePopup.setExtent(new Point(popupWidth, popupHeight));
+
+    // close dialog button
+    button = new PushButtonMorph(
+        this,
+        null,
+        (String.fromCharCode("0xf00d")),
+        null,
+        null,
+        null,
+        "redCircleIconButton"
+    );
+
+    button.setRight(this.createAnnouncePopup.right() - 3);
+    button.setTop(this.createAnnouncePopup.top() + 2);
+    button.action = handleAck;
+    button.drawNew();
+    button.fixLayout();
+    this.createAnnouncePopup.add(button);
+
+    // add title
+    this.createAnnouncePopup.labelString = "New Announcement!";
+    this.createAnnouncePopup.createLabel();
+
+    // success image
+    var successImage = new Morph();
+    successImage.texture = 'images/success.png';
+    successImage.drawNew = function () {
+        this.image = newCanvas(this.extent());
+        var context = this.image.getContext('2d');
+        var picBgColor = myself.createAnnouncePopup.color;
+        context.fillStyle = picBgColor.toString();
+        context.fillRect(0, 0, this.width(), this.height());
+        if (this.texture) {
+            this.drawTexture(this.texture);
+        }
+    };
+
+    successImage.setExtent(new Point(128, 128));
+    successImage.setCenter(this.createAnnouncePopup.center());
+    successImage.setTop(this.createAnnouncePopup.top() + 40);
+    this.createAnnouncePopup.add(successImage);
+
+    // success message
+    txt = new TextMorph(message);
+    txt.setCenter(this.createAnnouncePopup.center());
+    txt.setTop(successImage.bottom() + 20);
+    this.createAnnouncePopup.add(txt);
+    txt.drawNew();
+
+    // "got it!" button, closes the dialog.
+    ackButton = new PushButtonMorph(null, null, "Understood!", null, null, null, "green");
+    ackButton.setCenter(this.createAnnouncePopup.center());
+    ackButton.setBottom(this.createAnnouncePopup.bottom() - 10);
+    ackButton.action = handleAck;
+    this.createAnnouncePopup.add(ackButton);
+
+    // popup
+    this.createAnnouncePopup.drawNew();
+    this.createAnnouncePopup.fixLayout();
+    this.createAnnouncePopup.popUp(world);
+};
+
+/* popups when announcement is acknowledged completely */
+IDE_Morph.prototype.showAnnouncementSuccess = function() {
+    var handleClose = function() {
+      myself.createReadPopup.cancel();
+    }
+
+    var world = this.world();
+    var myself = this;
+    var popupWidth = 400;
+    var popupHeight = 330;
+
+    if (this.createReadPopup) {
+        this.createReadPopup.destroy();
+    }
+    this.createReadPopup = new DialogBoxMorph();
+    this.createReadPopup.setExtent(new Point(popupWidth, popupHeight));
+
+    // close dialog button
+    button = new PushButtonMorph(
+        this,
+        null,
+        (String.fromCharCode("0xf00d")),
+        null,
+        null,
+        null,
+        "redCircleIconButton"
+    );
+
+    button.setRight(this.createReadPopup.right() - 3);
+    button.setTop(this.createReadPopup.top() + 2);
+    button.action = handleClose;
+    button.drawNew();
+    button.fixLayout();
+    this.createReadPopup.add(button);
+
+    // add title
+    this.createReadPopup.labelString = "Announcement Notice";
+    this.createReadPopup.createLabel();
+
+    // success image
+    var successImage = new Morph();
+    successImage.texture = 'images/success.png';
+    successImage.drawNew = function () {
+        this.image = newCanvas(this.extent());
+        var context = this.image.getContext('2d');
+        var picBgColor = myself.createReadPopup.color;
+        context.fillStyle = picBgColor.toString();
+        context.fillRect(0, 0, this.width(), this.height());
+        if (this.texture) {
+            this.drawTexture(this.texture);
+        }
+    };
+
+    successImage.setExtent(new Point(128, 128));
+    successImage.setCenter(this.createReadPopup.center());
+    successImage.setTop(this.createReadPopup.top() + 40);
+    this.createReadPopup.add(successImage);
+
+    // success message
+    txt = new TextMorph("Your announcement has been read by all members!");
+    txt.setCenter(this.createReadPopup.center());
+    txt.setTop(successImage.bottom() + 20);
+    this.createReadPopup.add(txt);
+    txt.drawNew();
+
+    // "got it!" button, closes the dialog.
+    doneButton = new PushButtonMorph(null, null, "Done", null, null, null, "green");
+    doneButton.setCenter(this.createReadPopup.center());
+    doneButton.setBottom(this.createReadPopup.bottom() - 10);
+    doneButton.action = handleClose;
+    this.createReadPopup.add(doneButton);
+
+    // popup
+    this.createReadPopup.drawNew();
+    this.createReadPopup.fixLayout();
+    this.createReadPopup.popUp(world);
+};
+
+/* popups when new announcement button is clicked */
+IDE_Morph.prototype.showNewAnnouncementPopup = function() {
+    var world = this.world();
+    var myself = this;
+    var popupWidth = 400;
+    var popupHeight = 300;
+
+    if (this.addAnnouncementPopup) {
+        this.addAnnouncementPopup.destroy();
+    }
+    this.addAnnouncementPopup = new DialogBoxMorph();
+    this.addAnnouncementPopup.setExtent(new Point(popupWidth, popupHeight));
+
+    // close dialog button
+    button = new PushButtonMorph(
+        this,
+        null,
+        (String.fromCharCode("0xf00d")),
+        null,
+        null,
+        null,
+        "redCircleIconButton"
+    );
+
+    button.setRight(this.addAnnouncementPopup.right() - 3);
+    button.setTop(this.addAnnouncementPopup.top() + 2);
+    button.action = function () { myself.addAnnouncementPopup.cancel(); };
+    button.drawNew();
+    button.fixLayout();
+    this.addAnnouncementPopup.add(button);
+
+    // the text input box
+    var announcementInput = new InputFieldMorph();
+    announcementInput.setWidth(350);
+    announcementInput.setCenter(myself.addAnnouncementPopup.center());
+    announcementInput.fontSize = 15;
+    announcementInput.typeInPadding = 4;
+    announcementInput.fixLayout();
+    announcementInput.drawNew();
+
+    this.addAnnouncementPopup.add(announcementInput);
+
+    // "Add" Button
+    announceButton = new PushButtonMorph(null, null, "Send Announcement", null, null, null, "green");
+    announceButton.setCenter(myself.addAnnouncementPopup.center());
+    announceButton.setTop(announcementInput.bottom() + 10);
+    announceButton.action = function () {
+        // get the username from the input
+        var announcement = announcementInput.getValue();
+        var txtColor = new Color(204, 0, 0);
+
+        if (announcement.length < 1) {
+            // show error message for blank username
+            if (this.txt) {
+                this.txt.destroy();
+            }
+            this.txt = new TextMorph("Please enter something to announce.");
+            this.txt.setColor(txtColor);
+            this.txt.setCenter(myself.addAnnouncementPopup.center());
+            this.txt.setTop(announceButton.bottom() + 20);
+            myself.addAnnouncementPopup.add(this.txt);
+            this.txt.drawNew();
+            myself.addAnnouncementPopup.fixLayout();
+            myself.addAnnouncementPopup.drawNew();
+
+        } else {
+          myself.sharer.socket.emit('ANNOUNCEMENT_REQUEST', {room: myself.shareboxId, message: announcement});
+          myself.addAnnouncementPopup.cancel();
+        }
+    };
+    this.addAnnouncementPopup.add(announceButton);
+
+    // add title
+    this.addAnnouncementPopup.labelString = "Broadcast Announcement";
+    this.addAnnouncementPopup.createLabel();
+
+    // popup
+    this.addAnnouncementPopup.drawNew();
+    this.addAnnouncementPopup.fixLayout();
+    this.addAnnouncementPopup.popUp(world);
 };
 
 // notifies the user that new member has been added successfully.
@@ -3761,14 +4036,14 @@ IDE_Morph.prototype.showRemoveMemberFailurePopup = function(username) {
 // ****************************
 
 IDE_Morph.prototype.openLibrary = function () {
-	
+
     if (this.library) {
         this.library.destroy();
     }
 
     this.library = new DialogBoxMorph();
     var myself = this;
-	
+
 	//console.log();
     // style library
 	if(myself.refreshPage === 0){
@@ -4019,7 +4294,7 @@ IDE_Morph.prototype.createImage = function() {
 
         //var imagetoshow = new Image();
         var imagetoshow = new Image();
-		
+
 		imagetoshow.onload = function () {
             var canvas = newCanvas(new Point(imagetoshow.width, imagetoshow.height));
             canvas.getContext('2d').drawImage(imagetoshow, 0, 0);
@@ -4031,25 +4306,25 @@ IDE_Morph.prototype.createImage = function() {
         //imagetoshow.height = screen.width * 0.1;
 		//imagetoshow.setWidth(screen.width * 0.1);
 		//imagetoshow.setHeight(screen.width * 0.1);
-		
+
         //sprite.setWidth(screen.width * 0.1);
         //sprite.setHeight(screen.width * 0.1);
 		//sprite.width = screen.width *0.2;
 
         sprite.image = imagetoshow;
         sprite.name = line.name;
-		
-		
+
+
 		//imagetoshow.size = 10;
         //debugger;
         var heightindex = Math.floor(i/5);
         //sprite.setPosition(new Point(spacelength + (i%5)*150, spaceheight + (heightindex%3) * 180));
 		sprite.setPosition(new Point(spacelength + (i%5)*myself.library.width() * 0.17, spaceheight + (heightindex%3) * myself.library.height() * 0.3));
         sprite.isDraggable = false;
-        
+
 		//imagetoshow.setExtent(thumbSize);
 		thumbnail = new Morph();
-		
+
 		thumbnail.setExtent(thumbSize);
 		thumbnail.image = sprite.thumbnail(thumbSize);
 		thumbnail.setPosition(
@@ -4580,7 +4855,7 @@ IDE_Morph.prototype.showLibraryPages = function() {
     this.library.add(prevButton);
     this.library.add(nextButton);
     this.library.add(pageText);
-	
+
 	this.library.changed;
 	//this.goNextPage();
 }
@@ -4627,7 +4902,13 @@ IDE_Morph.prototype.fixLayout = function (situation) {
     var shareBoxInternalLeftPadding = 6;
 
     // heights and widths
-    var shareBoxTitleBarButtonsWidth = 90;
+    if(this.shareboxId === tempIdentifier){
+      var shareBoxTitleBarButtonsWidth = 135;
+    }
+    else {
+      var shareBoxTitleBarButtonsWidth = 90
+    }
+
     var shareBoxTitleBarHeight = 30;
     var corralBarHeight = 90;
 
@@ -8097,7 +8378,7 @@ ProjectDialogMorph.prototype.setSource = function (source) {
             break;
         case 'local':
             this.projectList = this.getLocalProjectList();
-            break;
+             break;
     }
 
     this.listField.destroy();
@@ -10466,4 +10747,3 @@ ShareBoxScriptsMorph.prototype.reactToDropOf = function (blockMorph) {
         blockMorph.slideBackTo(world.hand.grabOrigin);
     }
 };
-

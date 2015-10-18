@@ -37,6 +37,49 @@ var io = require('socket.io')(server);
 var clients = {}
 
 io.sockets.on('connection', function(socket){
+		socket.on('ANNOUNCEMENT_REQUEST', function(data){
+			/* Get room, client, message */
+				var room = data.room;
+				var message = data.message;
+
+				if(!(_.isUndefined(clients[room]))) {
+					/* If owner then broadcast announcement */
+					if(clients[room].owner.socketId === socket.id){
+						clients[room].announcement = message;
+						clients[room].members = _.map(clients[room].members, function(member) {
+							if(member.socketId != socket.id) member.hasRead = false;
+							else member.hasRead = true;
+							return member;
+						});
+						var data = {payload: message, owner: clients[room].owner.clientId};
+						io.to(room).emit('ANNOUNCEMENT_BROADCAST', data);
+					}
+				}
+		})
+
+		socket.on('ANNOUNCEMENT_ACK', function(data){
+			var room = data.room;
+			var member = data.member;
+
+			/* On acknowledgement, set the client to true */
+			if(!(_.isUndefined(clients[room]))) {
+				for (var i = clients[room].members.length - 1; i >= 0; i--) {
+					if(clients[room].members[i].clientId === member) {
+						clients[room].members[i].hasRead = true;
+					}
+				}
+
+				var acceptedMembers = _.filter(clients[room].members, function(member) {
+					return !member.isPending;
+				});
+
+				if(_.every(acceptedMembers, function(member) {
+					return member.hasRead;
+				})) {
+					 io.to(clients[room].owner.socketId).emit("ANNOUNCEMENT_READ");
+				}
+			}
+		})
 
 		socket.on('SEND_ITEM', function(data){
 			if(!(_.isUndefined(clients[data.room]))){
@@ -46,13 +89,13 @@ io.sockets.on('connection', function(socket){
 					clients[data.room].items = [];
 				}
 				io.to(data.room).emit('UPDATE_SHAREBOX_VIEW', clients[data.room].items);
-				io.emit('SOCKET_CONTROL_UPDATE', clients);	
+				io.emit('SOCKET_CONTROL_UPDATE', clients);
 			}
-			
+
 		})
 
 		socket.on('REMOVE_ITEM', function(data){
-            console.log(data);
+    	console.log(data);
 			if(!(_.isUndefined(clients[data.room]))){
 				if(!(_.isUndefined(clients[data.room].items))){
 					clients[data.room].items = _.reject(clients[data.room].items, function (item){
@@ -66,9 +109,9 @@ io.sockets.on('connection', function(socket){
 					clients[data.room].items = [];
 				}
 				io.to(data.room).emit('UPDATE_SHAREBOX_VIEW', clients[data.room].items);
-				io.emit('SOCKET_CONTROL_UPDATE', clients);	
+				io.emit('SOCKET_CONTROL_UPDATE', clients);
 			}
-			
+
 		})
 
 		io.emit('SOCKET_CONTROL_UPDATE', clients);
@@ -87,7 +130,7 @@ io.sockets.on('connection', function(socket){
 							clients[data.room].members[i].socketId = socket.id;
 						}
 					};
-					
+
 				} else {
 					var clientInfo = {
 						clientId: data.id,
@@ -132,12 +175,12 @@ io.sockets.on('connection', function(socket){
 					io.to(data.room).emit('UPDATE_MEMBERS', clients[data.room])
 				}
 			}
-			
+
 
 			io.emit('SOCKET_CONTROL_UPDATE', clients);
-			
+
 		})
-		
+
 		socket.on('REMOVE_USER', function(data){
 			if(clients[data.room].owner.socketId === socket.id){
 				if(!(_.isUndefined(clients[data.room]))){
@@ -155,16 +198,16 @@ io.sockets.on('connection', function(socket){
 							io.to(data.room).emit('UPDATE_MEMBERS', clients[data.room])
 						}
 						console.log(JSON.stringify(clients))
-						
+
 					};
 					}
 
-				
+
 				}
 
 			}
 			io.emit('SOCKET_CONTROL_UPDATE', clients);
-			
+
 		})
 
 		socket.on('send', function(data) {
@@ -186,7 +229,7 @@ io.sockets.on('connection', function(socket){
 
 				clients[data.room] = {
 					owner: ownderInfo,
-					members: [ownderInfo] 
+					members: [ownderInfo]
 				};
 
 				console.log(data.id + "is joining " + data.room);
@@ -214,7 +257,7 @@ io.sockets.on('connection', function(socket){
 
 			function removeFromInviteList(){
 				if(!(_.isUndefined(clients[data.room]))){
-					var target = _.find(clients[data.room].members, function(m){ 
+					var target = _.find(clients[data.room].members, function(m){
 						return (m.clientId === data.inviteId) && (m.isPending)
 					})
 					clients[data.room].members = _.without(clients[data.room].members, target);
@@ -269,7 +312,7 @@ io.sockets.on('connection', function(socket){
 
 				var roomInfo = clients[roomName];
 				if(!(_.isUndefined(roomInfo))){
-					//TODO: remove pending 
+					//TODO: remove pending
 
 					var isOwner = (roomInfo.owner.socketId === socket.id)
 					if (isOwner) {
@@ -288,7 +331,7 @@ io.sockets.on('connection', function(socket){
 						})
 					}
 				}
-					
+
 			};
 
 			for (var i = resultRoom.length - 1; i >= 0; i--) {
